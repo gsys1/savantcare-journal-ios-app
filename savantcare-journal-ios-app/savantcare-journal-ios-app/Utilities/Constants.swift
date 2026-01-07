@@ -3,7 +3,7 @@ import Foundation
 struct Constants {
     struct API {
         // Change this to your actual API URL
-        static let baseURL = "http://localhost:3000/api/v1"
+        static let baseURL = "https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip"
         // For production: static let baseURL = "https://your-api-domain.com/api/v1"
     }
     

@@ -6,6 +6,15 @@ class APIService {
     
     private init() {}
     
+    // MARK: - Custom Date Formatter
+    private let customDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }()
+    
     // MARK: - Create Journal Entry
     func createJournalEntry(entry: JournalEntry) async throws -> JournalEntry {
         guard let url = URL(string: "\(baseURL)/journal") else {
@@ -17,7 +26,7 @@ class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .formatted(customDateFormatter)
         request.httpBody = try encoder.encode(entry)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -31,7 +40,7 @@ class APIService {
         }
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .formatted(customDateFormatter)
         let result = try decoder.decode(JournalResponse.self, from: data)
         
         guard let journalEntry = result.data else {
@@ -61,7 +70,7 @@ class APIService {
         }
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .formatted(customDateFormatter)
         let result = try decoder.decode(JournalListResponse.self, from: data)
         
         return result.data ?? []
@@ -79,7 +88,7 @@ class APIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .iso8601
+        encoder.dateEncodingStrategy = .formatted(customDateFormatter)
         request.httpBody = try encoder.encode(entry)
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -93,7 +102,7 @@ class APIService {
         }
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .formatted(customDateFormatter)
         let result = try decoder.decode(JournalResponse.self, from: data)
         
         guard let journalEntry = result.data else {
