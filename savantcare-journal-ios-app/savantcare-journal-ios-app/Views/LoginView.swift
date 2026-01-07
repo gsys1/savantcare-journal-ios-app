@@ -20,7 +20,7 @@ struct LoginView: View {
                         .font(.largeTitle)
                         .fontWeight(.bold)
                     
-                    Text("Your Health, Your Story")
+                    Text("Let your doctor know how you are doing between appointments.")
                         .font(.subheadline)
                         .foregroundColor(.gray)
                 }
