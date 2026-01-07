@@ -2,156 +2,165 @@ import Foundation
 
 class APIService {
     static let shared = APIService()
-    private let baseURL = Constants.API.baseURL
+    
+    private let baseURL = "https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip"
     
     private init() {}
     
-    // MARK: - Custom Date Formatter
-    private let customDateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
-    }()
-    
-    // MARK: - Create Journal Entry
-    func createJournalEntry(entry: JournalEntry) async throws -> JournalEntry {
-        guard let url = URL(string: "\(baseURL)/journal") else {
-            throw APIError.invalidURL
-        }
-        
+    // MARK: - Helper to add auth headers
+    private func createRequest(url: URL, method: String = "GET") -> URLRequest {
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .formatted(customDateFormatter)
-        request.httpBody = try encoder.encode(entry)
+        // Add auth token if available
+        if let token = AuthService.shared.authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        return request
+    }
+    
+    // MARK: - Create Entry (uses logged-in user ID)
+    func createEntry(title: String, content: String, mood: String, symptoms: String?, medications: String?) async throws -> JournalEntry {
+        guard let patientId = AuthService.shared.currentUserId else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
+        }
+        
+        let url = URL(string: "\(baseURL)/journal")!
+        var request = createRequest(url: url, method: "POST")
+        
+        // Create JSON manually to ensure snake_case
+        let jsonDict: [String: Any] = [
+            "patient_id": patientId,
+            "title": title,
+            "content": content,
+            "mood": mood,
+            "symptoms": symptoms as Any,
+            "medications": medications as Any
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: jsonDict)
+        
+        print("🔵 Creating entry for patient: \(patientId)")
+        print("🔵 Request body: \(String(data: request.httpBody!, encoding: .utf8) ?? "")")
         
         let (data, response) = try await URLSession.shared.data(for: request)
         
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
+        print("🔵 Create Response: \(String(data: data, encoding: .utf8) ?? "")")
         
-        guard httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
-            throw APIError.serverError(httpResponse.statusCode)
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 || httpResponse.statusCode == 201 else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Failed to create entry"])
         }
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .formatted(customDateFormatter)
-        let result = try decoder.decode(JournalResponse.self, from: data)
+        let journalResponse = try decoder.decode(JournalResponse.self, from: data)
         
-        guard let journalEntry = result.data else {
-            throw APIError.noData
+        guard let journalEntry = journalResponse.data else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: journalResponse.message])
         }
         
         return journalEntry
     }
     
-    // MARK: - Fetch All Entries
-    func fetchJournalEntries(patientId: String) async throws -> [JournalEntry] {
-        guard let url = URL(string: "\(baseURL)/journal/patient/\(patientId)") else {
-            throw APIError.invalidURL
+    // MARK: - Get Entries (for logged-in user)
+    func getEntries() async throws -> [JournalEntry] {
+        guard let patientId = AuthService.shared.currentUserId else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "User not logged in"])
         }
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
+        let url = URL(string: "\(baseURL)/journal/patient/\(patientId)")!
+        let request = createRequest(url: url)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        print("🔵 Fetching entries for patient: \(patientId)")
+        print("🔵 URL: \(url)")
         
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            
+            print("🔵 Get Entries Response Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+            print("🔵 Get Entries Response: \(String(data: data, encoding: .utf8) ?? "")")
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response"])
+            }
+            
+            // Handle 404 as empty list (no entries yet)
+            if httpResponse.statusCode == 404 {
+                print("⚠️ No entries found (404) - returning empty list")
+                return []
+            }
+            
+            guard httpResponse.statusCode == 200 else {
+                throw NSError(domain: "", code: httpResponse.statusCode, 
+                             userInfo: [NSLocalizedDescriptionKey: "Server returned status \(httpResponse.statusCode)"])
+            }
+            
+            let decoder = JSONDecoder()
+            let listResponse = try decoder.decode(JournalListResponse.self, from: data)
+            return listResponse.data ?? []
+            
+        } catch {
+            print("❌ Error fetching entries: \(error)")
+            throw error
+        }
+    }
+    
+    // MARK: - Update Entry
+    func updateEntry(_ entry: JournalEntry) async throws -> JournalEntry {
+        guard let id = entry.id else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Entry ID is missing"])
         }
         
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode)
-        }
+        let url = URL(string: "\(baseURL)/journal/\(id)")!
+        var request = createRequest(url: url, method: "PUT")
+        
+        // Create JSON manually to ensure snake_case
+        let jsonDict: [String: Any] = [
+            "id": id,
+            "patient_id": entry.patientId,
+            "title": entry.title,
+            "content": entry.content,
+            "mood": entry.mood,
+            "symptoms": entry.symptoms as Any,
+            "medications": entry.medications as Any
+        ]
+        
+        request.httpBody = try JSONSerialization.data(withJSONObject: jsonDict)
+        
+        print("🔵 Updating entry ID: \(id)")
+        print("🔵 Request body: \(String(data: request.httpBody!, encoding: .utf8) ?? "")")
+        
+        let (data, _) = try await URLSession.shared.data(for: request)
+        
+        print("🔵 Update Response: \(String(data: data, encoding: .utf8) ?? "")")
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .formatted(customDateFormatter)
-        let result = try decoder.decode(JournalListResponse.self, from: data)
+        let response = try decoder.decode(JournalResponse.self, from: data)
         
-        return result.data ?? []
+        guard let updatedEntry = response.data else {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: response.message])
+        }
+        
+        return updatedEntry
     }
     
-    // MARK: - Update Journal Entry
-    func updateJournalEntry(entry: JournalEntry) async throws -> JournalEntry {
-        guard let id = entry.id,
-              let url = URL(string: "\(baseURL)/journal/\(id)") else {
-            throw APIError.invalidURL
-        }
+    // MARK: - Delete Entry
+    func deleteEntry(id: Int) async throws {
+        let url = URL(string: "\(baseURL)/journal/\(id)")!
+        let request = createRequest(url: url, method: "DELETE")
         
-        var request = URLRequest(url: url)
-        request.httpMethod = "PUT"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        print("🔵 Deleting entry ID: \(id)")
         
-        let encoder = JSONEncoder()
-        encoder.dateEncodingStrategy = .formatted(customDateFormatter)
-        request.httpBody = try encoder.encode(entry)
+        let (data, _) = try await URLSession.shared.data(for: request)
         
-        let (data, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode)
-        }
+        print("🔵 Delete Response: \(String(data: data, encoding: .utf8) ?? "")")
         
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .formatted(customDateFormatter)
-        let result = try decoder.decode(JournalResponse.self, from: data)
+        let response = try decoder.decode(JournalResponse.self, from: data)
         
-        guard let journalEntry = result.data else {
-            throw APIError.noData
-        }
-        
-        return journalEntry
-    }
-    
-    // MARK: - Delete Journal Entry
-    func deleteJournalEntry(id: Int) async throws {
-        guard let url = URL(string: "\(baseURL)/journal/\(id)") else {
-            throw APIError.invalidURL
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "DELETE"
-        
-        let (_, response) = try await URLSession.shared.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw APIError.invalidResponse
-        }
-        
-        guard httpResponse.statusCode == 200 else {
-            throw APIError.serverError(httpResponse.statusCode)
-        }
-    }
-}
-
-enum APIError: LocalizedError {
-    case invalidURL
-    case invalidResponse
-    case serverError(Int)
-    case noData
-    case decodingError
-    
-    var errorDescription: String? {
-        switch self {
-        case .invalidURL:
-            return "Invalid URL"
-        case .invalidResponse:
-            return "Invalid response from server"
-        case .serverError(let code):
-            return "Server error with code: \(code)"
-        case .noData:
-            return "No data received"
-        case .decodingError:
-            return "Failed to decode response"
+        if !response.success {
+            throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: response.message])
         }
     }
 }

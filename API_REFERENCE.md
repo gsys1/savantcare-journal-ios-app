@@ -6,34 +6,101 @@ This document describes the required REST API endpoints for the SavantCare Journ
 
 ```
 Development: http://localhost:3000/api/v1
-Production: https://api.savantcare.com/api/v1
+Production: https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip
 ```
 
 ## Authentication
 
-Currently, the app uses a static patient ID. In production, implement JWT or OAuth2 authentication.
+The app uses email/password authentication. Upon successful login, the user session is stored locally using UserDefaults.
 
-## Endpoints
+---
 
-### 1. Create Journal Entry
+## Authentication Endpoints
 
-Creates a new journal entry for a patient.
+### 1. User Login
+
+Authenticates a user with email and password.
+
+**Endpoint:** `POST /auth/login`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "emailAddress": "samuel@savantcare.com",
+  "password": "$2y$10$4aOXDZ0LJXx7iCmpzjkIH$2y$10$aOXDZ0LJXx7iCmpzjkIH"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
+      "publicUniqueId": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
+      "facebookID": null,
+      "emailAddress": "samuel@savantcare.com",
+      "wikiUid": "samuel@savantcare.com"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." // Optional: JWT token
+  }
+}
+```
+
+**Error Response (401 Unauthorized):**
+```json
+{
+  "success": false,
+  "message": "Invalid email or password"
+}
+```
+
+**Error Response (400 Bad Request):**
+```json
+{
+  "success": false,
+  "message": "Email and password are required"
+}
+```
+
+**Error Response (500 Internal Server Error):**
+```json
+{
+  "success": false,
+  "message": "Internal server error"
+}
+```
+
+---
+
+## Journal Entry Endpoints
+
+### 2. Create Journal Entry
+
+Creates a new journal entry for the authenticated patient.
 
 **Endpoint:** `POST /journal`
 
 **Headers:**
 ```
 Content-Type: application/json
-Authorization: Bearer {token} (for production)
+Authorization: Bearer {token} (optional)
 ```
 
 **Request Body:**
 ```json
 {
-  "patient_id": "PATIENT_001",
+  "patient_id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
   "title": "Feeling Better Today",
   "content": "Had a good day with minimal symptoms. Morning walk helped.",
-  "mood": "😊 Happy",
+  "mood": "😊",
   "symptoms": "Mild headache",
   "medications": "Aspirin 500mg"
 }
@@ -46,15 +113,23 @@ Authorization: Bearer {token} (for production)
   "message": "Entry created successfully",
   "data": {
     "id": 1,
-    "patient_id": "PATIENT_001",
+    "patient_id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
     "title": "Feeling Better Today",
     "content": "Had a good day with minimal symptoms. Morning walk helped.",
-    "mood": "😊 Happy",
+    "mood": "😊",
     "symptoms": "Mild headache",
     "medications": "Aspirin 500mg",
     "created_at": "2026-01-07T10:00:00Z",
     "updated_at": "2026-01-07T10:00:00Z"
   }
+}
+```
+
+**Error Response (401 Unauthorized):**
+```json
+{
+  "success": false,
+  "message": "User not logged in"
 }
 ```
 
@@ -65,21 +140,27 @@ Authorization: Bearer {token} (for production)
   "message": "Validation error",
   "errors": {
     "title": "Title is required",
-    "content": "Content is required"
+    "content": "Content is required",
+    "mood": "Mood is required"
   }
 }
 ```
 
 ---
 
-### 2. Get All Patient Entries
+### 3. Get All Patient Entries
 
-Retrieves all journal entries for a specific patient.
+Retrieves all journal entries for the authenticated patient.
 
 **Endpoint:** `GET /journal/patient/:patientId`
 
 **Parameters:**
-- `patientId` (path) - Patient identifier
+- `patientId` (path) - Patient identifier (user's ID from login)
+
+**Headers:**
+```
+Authorization: Bearer {token} (optional)
+```
 
 **Query Parameters (Optional):**
 - `limit` - Number of entries to return (default: 100)
@@ -94,10 +175,10 @@ Retrieves all journal entries for a specific patient.
   "data": [
     {
       "id": 2,
-      "patient_id": "PATIENT_001",
+      "patient_id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
       "title": "Check-up Day",
       "content": "Had my monthly check-up. Doctor says I'm improving.",
-      "mood": "😊 Happy",
+      "mood": "😊",
       "symptoms": null,
       "medications": "Vitamin D supplement",
       "created_at": "2026-01-07T14:00:00Z",
@@ -105,10 +186,10 @@ Retrieves all journal entries for a specific patient.
     },
     {
       "id": 1,
-      "patient_id": "PATIENT_001",
+      "patient_id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
       "title": "Feeling Better Today",
       "content": "Had a good day with minimal symptoms.",
-      "mood": "😊 Happy",
+      "mood": "😊",
       "symptoms": "Mild headache",
       "medications": "Aspirin 500mg",
       "created_at": "2026-01-07T10:00:00Z",
@@ -125,7 +206,7 @@ Retrieves all journal entries for a specific patient.
 
 ---
 
-### 3. Get Single Entry
+### 4. Get Single Entry
 
 Retrieves a specific journal entry by ID.
 
@@ -134,6 +215,11 @@ Retrieves a specific journal entry by ID.
 **Parameters:**
 - `id` (path) - Entry identifier
 
+**Headers:**
+```
+Authorization: Bearer {token} (optional)
+```
+
 **Success Response (200 OK):**
 ```json
 {
@@ -141,10 +227,10 @@ Retrieves a specific journal entry by ID.
   "message": "Entry retrieved successfully",
   "data": {
     "id": 1,
-    "patient_id": "PATIENT_001",
+    "patient_id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
     "title": "Feeling Better Today",
     "content": "Had a good day with minimal symptoms.",
-    "mood": "😊 Happy",
+    "mood": "😊",
     "symptoms": "Mild headache",
     "medications": "Aspirin 500mg",
     "created_at": "2026-01-07T10:00:00Z",
@@ -155,7 +241,7 @@ Retrieves a specific journal entry by ID.
 
 ---
 
-### 4. Update Journal Entry
+### 5. Update Journal Entry
 
 Updates an existing journal entry.
 
@@ -164,12 +250,18 @@ Updates an existing journal entry.
 **Parameters:**
 - `id` (path) - Entry identifier
 
+**Headers:**
+```
+Content-Type: application/json
+Authorization: Bearer {token} (optional)
+```
+
 **Request Body:**
 ```json
 {
   "title": "Updated Title",
   "content": "Updated content...",
-  "mood": "😌 Calm",
+  "mood": "😌",
   "symptoms": "No symptoms today",
   "medications": "Aspirin 500mg, Vitamin D"
 }
@@ -182,10 +274,10 @@ Updates an existing journal entry.
   "message": "Entry updated successfully",
   "data": {
     "id": 1,
-    "patient_id": "PATIENT_001",
+    "patient_id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
     "title": "Updated Title",
     "content": "Updated content...",
-    "mood": "😌 Calm",
+    "mood": "😌",
     "symptoms": "No symptoms today",
     "medications": "Aspirin 500mg, Vitamin D",
     "created_at": "2026-01-07T10:00:00Z",
@@ -196,7 +288,7 @@ Updates an existing journal entry.
 
 ---
 
-### 5. Delete Journal Entry
+### 6. Delete Journal Entry
 
 Deletes a journal entry.
 
@@ -204,6 +296,11 @@ Deletes a journal entry.
 
 **Parameters:**
 - `id` (path) - Entry identifier
+
+**Headers:**
+```
+Authorization: Bearer {token} (optional)
+```
 
 **Success Response (200 OK):**
 ```json
@@ -230,7 +327,7 @@ Deletes a journal entry.
 | 200 | Success |
 | 201 | Created |
 | 400 | Bad Request - Validation error |
-| 401 | Unauthorized - Invalid credentials |
+| 401 | Unauthorized - Invalid credentials or not logged in |
 | 404 | Not Found - Resource doesn't exist |
 | 500 | Internal Server Error |
 
@@ -241,80 +338,193 @@ All dates use ISO 8601 format:
 2026-01-07T10:00:00Z
 ```
 
-## Sample Node.js/Express Implementation
+## Sample PHP/MySQL Implementation
 
-```javascript
-// Example endpoint implementation
-app.post('/api/v1/journal', async (req, res) => {
-  try {
-    const { patient_id, title, content, mood, symptoms, medications } = req.body;
-    
-    // Validation
-    if (!title || !content || !mood) {
-      return res.status(400).json({
-        success: false,
-        message: 'Title, content, and mood are required'
-      });
-    }
-    
-    // Insert into database
-    const [result] = await db.query(
-      'INSERT INTO journal_entries (patient_id, title, content, mood, symptoms, medications) VALUES (?, ?, ?, ?, ?, ?)',
-      [patient_id, title, content, mood, symptoms, medications]
-    );
-    
-    // Fetch created entry
-    const [entries] = await db.query(
-      'SELECT * FROM journal_entries WHERE id = ?',
-      [result.insertId]
-    );
-    
-    res.status(201).json({
-      success: true,
-      message: 'Entry created successfully',
-      data: entries[0]
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
-  }
-});
+### Login Endpoint
+
+```php
+<?php
+// POST /api/aaip/auth/login
+
+header('Content-Type: application/json');
+
+$data = json_decode(file_get_contents('php://input'), true);
+$emailAddress = $data['emailAddress'] ?? '';
+$password = $data['password'] ?? '';
+
+if (empty($emailAddress) || empty($password)) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Email and password are required'
+    ]);
+    exit;
+}
+
+// Query database
+$stmt = $pdo->prepare('SELECT id, publicUniqueId, facebookID, emailAddress, password, wikiUid FROM users WHERE emailAddress = ?');
+$stmt->execute([$emailAddress]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$user || $user['password'] !== $password) {
+    http_response_code(401);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Invalid email or password'
+    ]);
+    exit;
+}
+
+// Remove password from response
+unset($user['password']);
+
+// Optional: Generate JWT token
+// $token = generateJWT($user['id']);
+
+echo json_encode([
+    'success' => true,
+    'message' => 'Login successful',
+    'data' => [
+        'user' => $user,
+        'token' => null // or $token if using JWT
+    ]
+]);
+```
+
+### Create Journal Entry Endpoint
+
+```php
+<?php
+// POST /api/aaip/journal
+
+header('Content-Type: application/json');
+
+$data = json_decode(file_get_contents('php://input'), true);
+
+// Validation
+if (empty($data['title']) || empty($data['content']) || empty($data['mood'])) {
+    http_response_code(400);
+    echo json_encode([
+        'success' => false,
+        'message' => 'Title, content, and mood are required'
+    ]);
+    exit;
+}
+
+// Insert into database
+$stmt = $pdo->prepare('
+    INSERT INTO journal_entries (patient_id, title, content, mood, symptoms, medications, created_at, updated_at) 
+    VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+');
+
+$stmt->execute([
+    $data['patient_id'],
+    $data['title'],
+    $data['content'],
+    $data['mood'],
+    $data['symptoms'] ?? null,
+    $data['medications'] ?? null
+]);
+
+// Fetch created entry
+$entryId = $pdo->lastInsertId();
+$stmt = $pdo->prepare('SELECT * FROM journal_entries WHERE id = ?');
+$stmt->execute([$entryId]);
+$entry = $stmt->fetch(PDO::FETCH_ASSOC);
+
+http_response_code(201);
+echo json_encode([
+    'success' => true,
+    'message' => 'Entry created successfully',
+    'data' => $entry
+]);
+```
+
+## Database Schema
+
+### Users Table
+```sql
+CREATE TABLE users (
+  id VARCHAR(255) PRIMARY KEY,
+  publicUniqueId VARCHAR(255) UNIQUE,
+  facebookID VARCHAR(255),
+  emailAddress VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  wikiUid VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+```
+
+### Journal Entries Table
+```sql
+CREATE TABLE journal_entries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  patient_id VARCHAR(255) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  mood VARCHAR(50) NOT NULL,
+  symptoms TEXT,
+  medications TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (patient_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_patient_id (patient_id),
+  INDEX idx_created_at (created_at)
+);
 ```
 
 ## Testing with cURL
 
-### Create Entry
+### Login
 ```bash
-curl -X POST http://localhost:3000/api/v1/journal \
+curl -X POST https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "patient_id": "PATIENT_001",
-    "title": "Test Entry",
-    "content": "This is a test",
-    "mood": "😊 Happy"
+    "emailAddress": "samuel@savantcare.com",
+    "password": "your_password_here"
   }'
 ```
 
-### Get Entries
+### Create Entry (with authenticated user ID)
 ```bash
-curl http://localhost:3000/api/v1/journal/patient/PATIENT_001
+curl -X POST https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip/journal \
+  -H "Content-Type: application/json" \
+  -d '{
+    "patient_id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
+    "title": "Test Entry",
+    "content": "This is a test",
+    "mood": "😊"
+  }'
+```
+
+### Get Entries for Patient
+```bash
+curl https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip/journal/patient/9b5281e6-b78a-49ee-a8db-100090e2b00001
 ```
 
 ### Update Entry
 ```bash
-curl -X PUT http://localhost:3000/api/v1/journal/1 \
+curl -X PUT https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip/journal/1 \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Updated Test Entry",
     "content": "Updated content",
-    "mood": "😌 Calm"
+    "mood": "😌"
   }'
 ```
 
 ### Delete Entry
 ```bash
-curl -X DELETE http://localhost:3000/api/v1/journal/1
+curl -X DELETE https://ehr.otip.savantcare.com/v1/api/p20/public/index.php/api/aaip/journal/1
 ```
+
+## Security Notes
+
+1. **Password Storage**: In production, passwords should be hashed using bcrypt or similar
+2. **JWT Tokens**: Implement JWT tokens for stateless authentication
+3. **HTTPS**: Always use HTTPS in production
+4. **Input Validation**: Sanitize all user inputs to prevent SQL injection
+5. **Rate Limiting**: Implement rate limiting on login endpoint
+6. **CORS**: Configure CORS properly for your iOS app
+7. **Session Management**: Consider implementing refresh tokens for better security

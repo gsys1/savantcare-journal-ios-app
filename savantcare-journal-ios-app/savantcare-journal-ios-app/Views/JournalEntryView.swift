@@ -1,76 +1,41 @@
 import SwiftUI
 
 struct JournalEntryView: View {
-    @ObservedObject var viewModel: JournalViewModel
     @Environment(\.dismiss) var dismiss
+    @ObservedObject var viewModel: JournalViewModel
     
-    @State private var title = ""
-    @State private var content = ""
-    @State private var selectedMood = Constants.Moods.all[0]
-    @State private var symptoms = ""
-    @State private var medications = ""
-    @State private var isSaving = false
+    @State private var title: String = ""
+    @State private var content: String = ""
+    @State private var selectedMood: String = "😊"
+    @State private var symptoms: String = ""
+    @State private var medications: String = ""
+    @State private var showError = false
+    @State private var errorMessage = ""
+    
+    let moods = ["😊", "😃", "😢", "😴", "😰", "😡", "🤒", "😷", "🤕", "😌"]
     
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("BASIC INFORMATION")) {
+                Section(header: Text("Entry Details")) {
                     TextField("Title", text: $title)
-                        .font(.body)
                     
                     Picker("How are you feeling?", selection: $selectedMood) {
-                        ForEach(Constants.Moods.all, id: \.self) { mood in
+                        ForEach(moods, id: \.self) { mood in
                             Text(mood).tag(mood)
                         }
                     }
-                    .pickerStyle(.menu)
+                    .pickerStyle(MenuPickerStyle())
                 }
                 
-                Section(header: Text("JOURNAL ENTRY")) {
-                    ZStack(alignment: .topLeading) {
-                        if content.isEmpty {
-                            Text("Write about your day, feelings, or health concerns...")
-                                .foregroundColor(.secondary)
-                                .padding(.top, 8)
-                                .padding(.leading, 4)
-                        }
-                        TextEditor(text: $content)
-                            .frame(minHeight: 150)
-                            .opacity(content.isEmpty ? 0.25 : 1)
-                    }
+                Section(header: Text("Journal Entry")) {
+                    TextEditor(text: $content)
+                        .frame(minHeight: 100)
                 }
                 
-                Section(header: Text("HEALTH DETAILS (Optional)")) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Symptoms", systemImage: "cross.case.fill")
-                            .font(.caption)
-                            .foregroundColor(.orange)
-                        TextField("e.g., Headache, fatigue, fever", text: $symptoms)
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 8) {
-                        Label("Medications", systemImage: "pills.fill")
-                            .font(.caption)
-                            .foregroundColor(.blue)
-                        TextField("e.g., Aspirin 500mg, Vitamin D", text: $medications)
-                    }
-                }
-                
-                Section {
-                    Button(action: saveEntry) {
-                        HStack {
-                            Spacer()
-                            if isSaving {
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle())
-                            } else {
-                                Label("Save Entry", systemImage: "checkmark.circle.fill")
-                                    .font(.headline)
-                            }
-                            Spacer()
-                        }
-                    }
-                    .disabled(title.isEmpty || content.isEmpty || isSaving)
+                Section(header: Text("Health Information (Optional)")) {
+                    TextField("Symptoms", text: $symptoms)
+                    TextField("Medications", text: $medications)
                 }
             }
             .navigationTitle("New Entry")
@@ -80,30 +45,38 @@ struct JournalEntryView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .disabled(isSaving)
                 }
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") {
+                        saveEntry()
+                    }
+                    .disabled(title.isEmpty || content.isEmpty)
+                }
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(errorMessage)
             }
         }
     }
     
     private func saveEntry() {
-        let entry = JournalEntry(
-            patientId: Constants.PatientInfo.currentPatientId,
-            title: title,
-            content: content,
-            mood: selectedMood,
-            symptoms: symptoms.isEmpty ? nil : symptoms,
-            medications: medications.isEmpty ? nil : medications,
-            createdAt: Date()
-        )
-        
-        isSaving = true
-        
         Task {
-            let success = await viewModel.createEntry(entry)
-            isSaving = false
+            let success = await viewModel.createEntry(
+                title: title,
+                content: content,
+                mood: selectedMood,
+                symptoms: symptoms.isEmpty ? nil : symptoms,
+                medications: medications.isEmpty ? nil : medications
+            )
+            
             if success {
                 dismiss()
+            } else {
+                errorMessage = viewModel.errorMessage ?? "Failed to save entry"
+                showError = true
             }
         }
     }

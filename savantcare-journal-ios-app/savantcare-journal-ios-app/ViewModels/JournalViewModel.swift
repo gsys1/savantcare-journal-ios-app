@@ -10,42 +10,65 @@ class JournalViewModel: ObservableObject {
     @Published var showError = false
     
     private let apiService = APIService.shared
-    private let patientId: String
     
-    init(patientId: String = Constants.PatientInfo.currentPatientId) {
-        self.patientId = patientId
+    init() {}
+    
+    // Get current patient ID from auth service
+    var currentPatientId: String {
+        return AuthService.shared.currentUserId ?? ""
     }
     
     func loadEntries() async {
-        isLoading = true
-        errorMessage = nil
-        
-        do {
-            entries = try await apiService.fetchJournalEntries(patientId: patientId)
-            entries.sort { ($0.createdAt ?? Date()) > ($1.createdAt ?? Date()) }
-        } catch {
-            errorMessage = error.localizedDescription
+        guard !currentPatientId.isEmpty else {
+            errorMessage = "No user logged in"
             showError = true
-            print("Error loading entries: \(error)")
+            return
         }
         
-        isLoading = false
+        isLoading = true
+        errorMessage = nil
+        
+        print("🔵 Loading entries for patient ID: \(currentPatientId)")
+        
+        do {
+            entries = try await apiService.getEntries()
+            isLoading = false
+            print("✅ Loaded \(entries.count) entries")
+        } catch {
+            isLoading = false
+            errorMessage = error.localizedDescription
+            showError = true
+            print("❌ Failed to load entries: \(error.localizedDescription)")
+        }
     }
     
-    func createEntry(_ entry: JournalEntry) async -> Bool {
+    func createEntry(title: String, content: String, mood: String, symptoms: String?, medications: String?) async -> Bool {
+        guard !currentPatientId.isEmpty else {
+            errorMessage = "No user logged in"
+            showError = true
+            return false
+        }
+        
         isLoading = true
         errorMessage = nil
         
         do {
-            let newEntry = try await apiService.createJournalEntry(entry: entry)
+            let newEntry = try await apiService.createEntry(
+                title: title,
+                content: content,
+                mood: mood,
+                symptoms: symptoms,
+                medications: medications
+            )
             entries.insert(newEntry, at: 0)
             isLoading = false
+            print("✅ Entry created successfully")
             return true
         } catch {
+            isLoading = false
             errorMessage = error.localizedDescription
             showError = true
-            print("Error creating entry: \(error)")
-            isLoading = false
+            print("❌ Failed to create entry: \(error.localizedDescription)")
             return false
         }
     }
@@ -55,36 +78,42 @@ class JournalViewModel: ObservableObject {
         errorMessage = nil
         
         do {
-            let updatedEntry = try await apiService.updateJournalEntry(entry: entry)
+            let updatedEntry = try await apiService.updateEntry(entry)
             if let index = entries.firstIndex(where: { $0.id == updatedEntry.id }) {
                 entries[index] = updatedEntry
             }
             isLoading = false
+            print("✅ Entry updated successfully")
             return true
         } catch {
+            isLoading = false
             errorMessage = error.localizedDescription
             showError = true
-            print("Error updating entry: \(error)")
-            isLoading = false
+            print("❌ Failed to update entry: \(error.localizedDescription)")
             return false
         }
     }
     
-    func deleteEntry(_ entry: JournalEntry) async {
-        guard let id = entry.id else { return }
-        
+    func deleteEntry(id: Int) async -> Bool {
         isLoading = true
         errorMessage = nil
         
         do {
-            try await apiService.deleteJournalEntry(id: id)
+            try await apiService.deleteEntry(id: id)
             entries.removeAll { $0.id == id }
+            isLoading = false
+            print("✅ Entry deleted successfully")
+            return true
         } catch {
+            isLoading = false
             errorMessage = error.localizedDescription
             showError = true
-            print("Error deleting entry: \(error)")
+            print("❌ Failed to delete entry: \(error.localizedDescription)")
+            return false
         }
-        
-        isLoading = false
+    }
+    
+    func refresh() async {
+        await loadEntries()
     }
 }

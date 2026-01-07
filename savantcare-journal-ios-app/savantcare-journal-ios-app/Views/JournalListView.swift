@@ -7,25 +7,32 @@ struct JournalListView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                Color(.systemGroupedBackground)
-                    .ignoresSafeArea()
-                
                 if viewModel.isLoading && viewModel.entries.isEmpty {
                     ProgressView("Loading entries...")
-                        .tint(.blue)
                 } else if viewModel.entries.isEmpty {
-                    emptyStateView
+                    EmptyStateView()
                 } else {
-                    entriesList
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(viewModel.entries) { entry in
+                                NavigationLink(destination: EntryDetailView(viewModel: viewModel, entry: entry)) {
+                                    JournalEntryCard(entry: entry)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .padding()
+                    }
+                    .refreshable {
+                        await viewModel.refresh()
+                    }
                 }
             }
-            .navigationTitle("Health Journal")
+            .navigationTitle("My Journal")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingNewEntry = true }) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.blue)
+                        Image(systemName: "plus")
                     }
                 }
             }
@@ -35,52 +42,13 @@ struct JournalListView: View {
             .alert("Error", isPresented: $viewModel.showError) {
                 Button("OK", role: .cancel) { }
             } message: {
-                Text(viewModel.errorMessage ?? "An unknown error occurred")
+                Text(viewModel.errorMessage ?? "Unknown error")
             }
-        }
-        .task {
-            await viewModel.loadEntries()
-        }
-    }
-    
-    private var emptyStateView: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "book.closed.fill")
-                .font(.system(size: 70))
-                .foregroundColor(.blue.opacity(0.6))
-            Text("No journal entries yet")
-                .font(.title2)
-                .fontWeight(.semibold)
-            Text("Start recording your health journey")
-                .font(.body)
-                .foregroundColor(.secondary)
-            
-            Button(action: { showingNewEntry = true }) {
-                Label("Create First Entry", systemImage: "plus.circle.fill")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding()
-                    .background(Color.blue)
-                    .cornerRadius(12)
-            }
-            .padding(.top)
-        }
-    }
-    
-    private var entriesList: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
-                ForEach(viewModel.entries) { entry in
-                    NavigationLink(destination: EntryDetailView(entry: entry, viewModel: viewModel)) {
-                        JournalEntryCard(entry: entry)
-                    }
-                    .buttonStyle(PlainButtonStyle())
+            .task {
+                if viewModel.entries.isEmpty {
+                    await viewModel.loadEntries()
                 }
             }
-            .padding()
-        }
-        .refreshable {
-            await viewModel.loadEntries()
         }
     }
 }
@@ -92,47 +60,72 @@ struct JournalEntryCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(entry.mood)
-                    .font(.system(size: 40))
-                Spacer()
-                if let date = entry.createdAt {
-                    VStack(alignment: .trailing) {
+                    .font(.title)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(entry.title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    if let date = entry.createdAt {
                         Text(date, style: .date)
                             .font(.caption)
                             .foregroundColor(.secondary)
-                        Text(date, style: .time)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
                     }
                 }
+                
+                Spacer()
+                
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
             }
-            
-            Text(entry.title)
-                .font(.headline)
-                .foregroundColor(.primary)
             
             Text(entry.content)
                 .font(.subheadline)
                 .foregroundColor(.secondary)
-                .lineLimit(3)
+                .lineLimit(2)
             
-            HStack(spacing: 16) {
-                if let symptoms = entry.symptoms, !symptoms.isEmpty {
-                    Label("Symptoms", systemImage: "cross.case.fill")
+            if let symptoms = entry.symptoms, !symptoms.isEmpty {
+                HStack {
+                    Image(systemName: "heart.text.square")
+                        .foregroundColor(.red)
+                    Text(symptoms)
                         .font(.caption)
-                        .foregroundColor(.orange)
-                }
-                
-                if let medications = entry.medications, !medications.isEmpty {
-                    Label("Meds", systemImage: "pills.fill")
-                        .font(.caption)
-                        .foregroundColor(.blue)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
             }
         }
         .padding()
-        .background(Color(.systemBackground))
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [Color.blue.opacity(0.1), Color.purple.opacity(0.1)]),
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
         .cornerRadius(12)
-        .shadow(color: .gray.opacity(0.2), radius: 5, x: 0, y: 2)
+        .shadow(radius: 2)
+    }
+}
+
+struct EmptyStateView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "book.closed")
+                .font(.system(size: 70))
+                .foregroundColor(.gray)
+            
+            Text("No Entries Yet")
+                .font(.title2)
+                .fontWeight(.semibold)
+            
+            Text("Tap the + button to create your first journal entry")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
     }
 }
 

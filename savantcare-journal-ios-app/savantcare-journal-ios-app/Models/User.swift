@@ -1,15 +1,44 @@
 import Foundation
 
 struct User: Codable {
-    var id: String
-    var firstName: String
-    var lastName: String
-    var email: String
+    let id: Int  // Changed from String to Int
+    let publicUniqueId: String
+    let facebookID: String?
+    let emailAddress: String
+    let password: String?
+    let wikiUid: String?
+    let firstName: String?
+    let lastName: String?
+    let fullname: String?
+    let role: String?
+    let companyID: Int?  // Changed from String to Int
     
     enum CodingKeys: String, CodingKey {
         case id
-        case firstName = "first_name"
-        case lastName = "last_name"
-        case email
+        case publicUniqueId = "publicUniqueId"
+        case facebookID = "facebookID"
+        case emailAddress = "emailAddress"
+        case password
+        case wikiUid = "wikiUid"
+        case firstName = "firstName"
+        case lastName = "lastName"
+        case fullname = "fullname"
+        case role
+        case companyID = "companyID"
     }
+}
+
+struct LoginRequest: Codable {
+    let emailAddress: String
+    let password: String
+}
+
+struct LoginResponse: Codable {
+    let success: Bool
+    let message: String
+    let data: UserData  // Changed back to UserData
+}
+
+struct UserData: Codable {
+    let user: User
 }
