@@ -39,7 +39,7 @@ struct LoginView: View {
                 VStack(spacing: 15) {
                     Picker("Login Method", selection: $loginMethod) {
                         Text("OTP").tag(LoginMethod.otp)
-                        Text("Email").tag(LoginMethod.email)
+                        Text("Password").tag(LoginMethod.email)
                     }
                     .pickerStyle(SegmentedPickerStyle())
                     .padding(.horizontal)
