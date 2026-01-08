@@ -71,6 +71,75 @@ class AuthService {
         }
     }
     
+    // MARK: - OTP Login
+    func sendOTP(otpSource: String) async throws -> Bool {
+        let url = URL(string: "\(baseURL)/auth/send-otp")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let jsonDict: [String: Any] = ["otpSource": otpSource]
+        request.httpBody = try JSONSerialization.data(withJSONObject: jsonDict)
+        
+        print("🔵 Send OTP Request: \(otpSource)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        // Assuming 200 OK means sent
+        if httpResponse.statusCode == 200 {
+            print("✅ OTP Sent successfully")
+            return true
+        } else {
+            let errorString = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(domain: "", code: httpResponse.statusCode, 
+                         userInfo: [NSLocalizedDescriptionKey: errorString])
+        }
+    }
+    
+    func verifyOTP(otpSource: String, otp: String) async throws -> User {
+        let url = URL(string: "\(baseURL)/auth/verify-otp")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let jsonDict: [String: Any] = [
+            "otpSource": otpSource,
+            "otp": otp
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: jsonDict)
+        
+        print("🔵 Verify OTP Request: \(otpSource) code: \(otp)")
+        
+        let (data, response) = try await URLSession.shared.data(for: request)
+        
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        
+        if httpResponse.statusCode == 200 {
+             do {
+                let loginResponse = try JSONDecoder().decode(LoginResponse.self, from: data)
+                saveUserSession(user: loginResponse.data.user, token: nil) // Token parsing not implemented in LoginResponse yet?
+                print("✅ OTP Verified. User logged in: \(loginResponse.data.user.emailAddress)")
+                return loginResponse.data.user
+            } catch {
+                print("❌ Decoding Error: \(error)")
+                 if let errorString = String(data: data, encoding: .utf8) {
+                    throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Server response: \(errorString)"])
+                }
+                throw error
+            }
+        } else {
+            let errorString = String(data: data, encoding: .utf8) ?? "Invalid OTP"
+            throw NSError(domain: "", code: httpResponse.statusCode, 
+                         userInfo: [NSLocalizedDescriptionKey: errorString])
+        }
+    }
+    
     // MARK: - Session Management
     private func saveUserSession(user: User, token: String?) {
         userDefaults.set(true, forKey: Keys.isLoggedIn)

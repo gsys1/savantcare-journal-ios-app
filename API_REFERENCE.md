@@ -77,6 +77,80 @@ Content-Type: application/json
   "message": "Internal server error"
 }
 ```
+---
+
+### 2. Send OTP
+
+Sends a One-Time Password to the user's phone number.
+
+**Endpoint:** `POST /auth/send-otp`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "otpSource": "1234567890" // or "user@example.com"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "OTP sent successfully"
+}
+```
+
+---
+
+### 3. Verify OTP
+
+Verifies the OTP sent to the user's phone number and logs them in.
+
+**Endpoint:** `POST /auth/verify-otp`
+
+**Headers:**
+```
+Content-Type: application/json
+```
+
+**Request Body:**
+```json
+{
+  "otpSource": "1234567890",
+  "otp": "123456"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "OTP verified successfully",
+  "data": {
+    "user": {
+      "id": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
+      "publicUniqueId": "9b5281e6-b78a-49ee-a8db-100090e2b00001",
+      "emailAddress": "samuel@savantcare.com",
+      // ... other fields
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+**Error Response (400 Bad Request):**
+```json
+{
+  "success": false,
+  "message": "Invalid OTP or Source"
+}
+```
+
 
 ---
 
