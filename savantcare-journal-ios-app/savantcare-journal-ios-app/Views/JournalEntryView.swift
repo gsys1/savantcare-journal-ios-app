@@ -42,8 +42,8 @@ struct JournalEntryView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
+                    NavigationLink(destination: JournalListView(viewModel: viewModel)) {
+                        Text("List View")
                     }
                 }
                 

@@ -9,11 +9,12 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var isLoggedIn = AuthService.shared.isLoggedIn
+    @StateObject private var journalViewModel = JournalViewModel()
     
     var body: some View {
         Group {
             if isLoggedIn {
-                MainTabView(isLoggedIn: $isLoggedIn)
+                MainTabView(isLoggedIn: $isLoggedIn, journalViewModel: journalViewModel)
             } else {
                 LoginView(isLoggedIn: $isLoggedIn)
             }
@@ -31,10 +32,11 @@ struct ContentView: View {
 
 struct MainTabView: View {
     @Binding var isLoggedIn: Bool
+    @ObservedObject var journalViewModel: JournalViewModel
     
     var body: some View {
         TabView {
-            JournalListView()
+            JournalEntryView(viewModel: journalViewModel)
                 .tabItem {
                     Label("Journal", systemImage: "book.fill")
                 }

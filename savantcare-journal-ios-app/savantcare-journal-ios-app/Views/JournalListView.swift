@@ -1,12 +1,12 @@
 import SwiftUI
 
 struct JournalListView: View {
-    @StateObject private var viewModel = JournalViewModel()
+    @ObservedObject var viewModel: JournalViewModel
     @State private var showingNewEntry = false
     
     var body: some View {
-        NavigationView {
-            ZStack {
+        // NavigationView removed as it's pushed from JournalEntryView
+        ZStack {
                 if viewModel.isLoading && viewModel.entries.isEmpty {
                     ProgressView("Loading entries...")
                 } else if viewModel.entries.isEmpty {
@@ -49,7 +49,6 @@ struct JournalListView: View {
                     await viewModel.loadEntries()
                 }
             }
-        }
     }
 }
 
@@ -130,5 +129,5 @@ struct EmptyStateView: View {
 }
 
 #Preview {
-    JournalListView()
+    JournalListView(viewModel: JournalViewModel())
 }
