@@ -29,13 +29,13 @@ struct JournalListView: View {
                 }
             }
             .navigationTitle("My Journal")
-            .toolbar {
+            /*.toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingNewEntry = true }) {
                         Image(systemName: "plus")
                     }
                 }
-            }
+            }*/
             .sheet(isPresented: $showingNewEntry) {
                 JournalEntryView(viewModel: viewModel)
             }
