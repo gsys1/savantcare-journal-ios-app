@@ -12,6 +12,8 @@ struct JournalEntryView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     
+    @State private var showSuccess = false
+    
     let moods = ["😊", "😃", "😢", "😴", "😰", "😡", "🤒", "😷", "🤕", "😌"]
     
     var body: some View {
@@ -59,6 +61,11 @@ struct JournalEntryView: View {
             } message: {
                 Text(errorMessage)
             }
+            .alert("Success", isPresented: $showSuccess) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("Entry saved successfully!")
+            }
         }
     }
     
@@ -73,12 +80,21 @@ struct JournalEntryView: View {
             )
             
             if success {
-                dismiss()
+                resetForm()
+                showSuccess = true
             } else {
                 errorMessage = viewModel.errorMessage ?? "Failed to save entry"
                 showError = true
             }
         }
+    }
+    
+    private func resetForm() {
+        title = ""
+        content = ""
+        selectedMood = "😊"
+        symptoms = ""
+        medications = ""
     }
 }
 
