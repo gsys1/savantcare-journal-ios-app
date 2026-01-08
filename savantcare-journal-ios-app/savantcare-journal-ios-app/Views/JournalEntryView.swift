@@ -4,40 +4,18 @@ struct JournalEntryView: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var viewModel: JournalViewModel
     
-    @State private var title: String = ""
     @State private var content: String = ""
-    @State private var selectedMood: String = "😊"
-    @State private var symptoms: String = ""
-    @State private var medications: String = ""
     @State private var showError = false
     @State private var errorMessage = ""
     
     @State private var showSuccess = false
     
-    let moods = ["😊", "😃", "😢", "😴", "😰", "😡", "🤒", "😷", "🤕", "😌"]
-    
     var body: some View {
         NavigationView {
             Form {
-                Section(header: Text("Entry Details")) {
-                    TextField("Title", text: $title)
-                    
-                    Picker("How are you feeling?", selection: $selectedMood) {
-                        ForEach(moods, id: \.self) { mood in
-                            Text(mood).tag(mood)
-                        }
-                    }
-                    .pickerStyle(MenuPickerStyle())
-                }
-                
                 Section(header: Text("Journal Entry")) {
                     TextEditor(text: $content)
-                        .frame(minHeight: 100)
-                }
-                
-                Section(header: Text("Health Information (Optional)")) {
-                    TextField("Symptoms", text: $symptoms)
-                    TextField("Medications", text: $medications)
+                        .frame(minHeight: 200)
                 }
             }
             .navigationTitle("New Entry")
@@ -53,7 +31,7 @@ struct JournalEntryView: View {
                     Button("Save") {
                         saveEntry()
                     }
-                    .disabled(title.isEmpty || content.isEmpty)
+                    .disabled(content.isEmpty)
                 }
             }
             .alert("Error", isPresented: $showError) {
@@ -71,12 +49,17 @@ struct JournalEntryView: View {
     
     private func saveEntry() {
         Task {
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            let defaultTitle = "Entry - \(formatter.string(from: Date()))"
+            
             let success = await viewModel.createEntry(
-                title: title,
+                title: defaultTitle,
                 content: content,
-                mood: selectedMood,
-                symptoms: symptoms.isEmpty ? nil : symptoms,
-                medications: medications.isEmpty ? nil : medications
+                mood: "😊",
+                symptoms: nil,
+                medications: nil
             )
             
             if success {
@@ -90,11 +73,7 @@ struct JournalEntryView: View {
     }
     
     private func resetForm() {
-        title = ""
         content = ""
-        selectedMood = "😊"
-        symptoms = ""
-        medications = ""
     }
 }
 
