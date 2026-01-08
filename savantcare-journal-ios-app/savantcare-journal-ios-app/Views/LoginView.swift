@@ -23,6 +23,8 @@ struct LoginView: View {
                     Text("Let your doctor know how you are doing between appointments.")
                         .font(.subheadline)
                         .foregroundColor(.gray)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
                 .padding(.top, 50)
                 
