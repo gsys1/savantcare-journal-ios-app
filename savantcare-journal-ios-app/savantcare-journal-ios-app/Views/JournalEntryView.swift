@@ -10,6 +10,9 @@ struct JournalEntryView: View {
     
     @State private var showSuccess = false
     
+    @State private var currentEntry: JournalEntry?
+    @State private var lastSavedContent: String = ""
+    
     var body: some View {
         NavigationView {
             Form {
@@ -28,10 +31,16 @@ struct JournalEntryView: View {
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        saveEntry()
+                    Button(action: {
+                        Task {
+                            if !content.isEmpty && content != lastSavedContent {
+                                await autoSave()
+                            }
+                            resetForm()
+                        }
+                    }) {
+                        Image(systemName: "plus")
                     }
-                    .disabled(content.isEmpty)
                 }
             }
             .alert("Error", isPresented: $showError) {
@@ -39,41 +48,53 @@ struct JournalEntryView: View {
             } message: {
                 Text(errorMessage)
             }
-            .alert("Success", isPresented: $showSuccess) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text("Entry saved successfully!")
+            .onChange(of: content) { newValue in
+                Task {
+                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 second debounce
+                    if newValue == content {
+                        await autoSave()
+                    }
+                }
             }
         }
     }
     
-    private func saveEntry() {
-        Task {
+    private func autoSave() async {
+        guard !content.isEmpty else { return }
+        guard content != lastSavedContent else { return }
+        
+        if var entry = currentEntry {
+            // Update existing
+            entry.content = content
+            let success = await viewModel.updateEntry(entry)
+            if success {
+                lastSavedContent = content
+                currentEntry = entry
+            }
+        } else {
+            // Create new
             let formatter = DateFormatter()
             formatter.dateStyle = .medium
             formatter.timeStyle = .short
             let defaultTitle = "Entry - \(formatter.string(from: Date()))"
             
-            let success = await viewModel.createEntry(
+            if let newEntry = await viewModel.createEntry(
                 title: defaultTitle,
                 content: content,
                 mood: "😊",
                 symptoms: nil,
                 medications: nil
-            )
-            
-            if success {
-                resetForm()
-                showSuccess = true
-            } else {
-                errorMessage = viewModel.errorMessage ?? "Failed to save entry"
-                showError = true
+            ) {
+                currentEntry = newEntry
+                lastSavedContent = content
             }
         }
     }
     
     private func resetForm() {
         content = ""
+        currentEntry = nil
+        lastSavedContent = ""
     }
 }
 

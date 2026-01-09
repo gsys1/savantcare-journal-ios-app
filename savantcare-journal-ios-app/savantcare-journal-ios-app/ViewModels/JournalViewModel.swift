@@ -42,11 +42,11 @@ class JournalViewModel: ObservableObject {
         }
     }
     
-    func createEntry(title: String, content: String, mood: String, symptoms: String?, medications: String?) async -> Bool {
+    func createEntry(title: String, content: String, mood: String, symptoms: String?, medications: String?) async -> JournalEntry? {
         guard !currentPatientId.isEmpty else {
             errorMessage = "No user logged in"
             showError = true
-            return false
+            return nil
         }
         
         isLoading = true
@@ -63,13 +63,13 @@ class JournalViewModel: ObservableObject {
             entries.insert(newEntry, at: 0)
             isLoading = false
             print("✅ Entry created successfully")
-            return true
+            return newEntry
         } catch {
             isLoading = false
             errorMessage = error.localizedDescription
             showError = true
             print("❌ Failed to create entry: \(error.localizedDescription)")
-            return false
+            return nil
         }
     }
     
