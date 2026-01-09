@@ -13,12 +13,15 @@ struct JournalEntryView: View {
     @State private var currentEntry: JournalEntry?
     @State private var lastSavedContent: String = ""
     
+    @FocusState private var isTextEditorFocused: Bool
+    
     var body: some View {
         NavigationView {
             Form {
                 Section(header: Text("Journal Entry")) {
                     TextEditor(text: $content)
                         .frame(minHeight: 200)
+                        .focused($isTextEditorFocused)
                 }
             }
             .navigationTitle("New Entry")
@@ -54,6 +57,12 @@ struct JournalEntryView: View {
                     if newValue == content {
                         await autoSave()
                     }
+                }
+            }
+            .onAppear {
+                // Add a small delay to ensure view is fully loaded
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    isTextEditorFocused = true
                 }
             }
         }
